@@ -22,4 +22,3 @@ The listed samples below (N = 14 total) are mising from the analysis due to havi
 11. sample 88 (Ileal, D13, CONV, C, from Isolator 20)
 12. sample 89 (Ileal, D13, SG, C, from Isolator 21)
 13. sample 174 (Cecal, D21, CONV, ST, from Isolator 15)
-14. 
