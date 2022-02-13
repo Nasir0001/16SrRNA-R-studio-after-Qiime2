@@ -38,6 +38,6 @@ and
 CecalRScripts/ that contains:
 the 5 different scripts used in R studio for cecal samples to perform alpha and beta diversity analyses and obtain taxanomic and differentially abundant genera plots.
 
-NOTE: There are 5 scripts from each intestinal location represents a a slightly different script for each day of the experiment (D7, D13, D17, D21, D24).
+NOTE: There are 5 scripts from each intestinal location that represents a slightly different script for each day of the experiment (D7, D13, D17, D21, D24).
 NOTE: This project was done on Purdue University's computing clusters. Therefore, some parts of code may not pertain to your local machine when reading the Qiime scripts.
 
