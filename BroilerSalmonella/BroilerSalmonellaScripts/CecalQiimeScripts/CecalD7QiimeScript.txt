@@ -1,0 +1,213 @@
+#!/bin/sh -l
+
+#SBATCH --nodes=1                   ##number of requested nodes (a node is a group of CPUs)
+#SBATCH --tasks-per-node=10         ##number of requested CPUs
+#SBATCH --time=10:00:00             ##time requested
+#SBATCH --job-name Cecal_D7         ##name of job
+#SBATCH -A john2185                 ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+#step 1, cd into the proper directory. This directory must already exist
+
+cd $RCAC_SCRATCH
+cd qiime/Cecal_D7
+
+pwd
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading qiime2-2020.2"
+module load Qiime/2-2020.2
+
+#step 3, Run the code you want
+
+echo "Start time"
+date +"%d %B %Y %H:%M:%S"
+
+echo "Initiating cecal D7 pipeline"
+
+echo "Paired-end read analysis"
+
+#Paired-end read analysis commands
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path Cecal_all.files \
+  --input-format PairedEndFastqManifestPhred33V2 \
+  --output-path demux.qza
+
+echo "Demultiplex"
+
+#Demultiplex
+qiime demux summarize \
+  --i-data demux.qza \
+  --o-visualization demux.qzv
+
+echo "Dada2 for error corrections"
+
+#De-noise. Error Corrections.
+#obtain orginal table.qza
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux.qza \
+  --p-trim-left-f 5 \
+  --p-trim-left-r 5 \
+  --p-trunc-len-f 251 \
+  --p-trunc-len-r 251 \
+  --o-table table.qza \
+  --o-representative-sequences rep-seqs.qza \
+  --o-denoising-stats denoising-stats.qza
+
+#convert qza to qzv
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+qiime metadata tabulate \
+  --m-input-file denoising-stats.qza \
+  --o-visualization denoising-stats.qzv
+
+echo "phylogenetic tree"
+
+#create a phylogenetic tree
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --o-alignment aligned-rep-seqs.qza \
+  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  --o-tree unrooted-tree.qza \
+  --o-rooted-tree rooted-tree.qza
+
+echo "taxonomy"
+
+#perform feature-classifier & metadata tabulate
+wget \
+  -O "silva-132-99-515-806-nb-classifier.qza" \
+  "https://data.qiime2.org/2020.2/common/silva-132-99-515-806-nb-classifier.qza"
+
+#NOTE: perform this taxonomy portion on a high memory cluster
+qiime feature-classifier classify-sklearn \
+  --i-classifier silva-132-99-515-806-nb-classifier.qza \
+  --i-reads rep-seqs.qza \
+  --o-classification taxonomy.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy.qza \
+  --o-visualization taxonomy.qzv
+
+echo "removal of mitochondria and chloroplast"
+
+#obtain table without mitochondria or chloroplast. NMC-table.qza (No Mitochondria Chloroplast)
+qiime taxa filter-table \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-exclude mitochondria,chloroplast \
+  --o-filtered-table NMC-table.qza
+
+echo "subseting"
+
+#obtain table that only has D7 subjects
+qiime feature-table filter-samples \
+  --i-table NMC-table.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --p-where "[Age] IN ('7')" \
+  --o-filtered-table SS-filtered-table.qza
+
+#Convert .qza to .qzv format
+qiime feature-table summarize \
+  --i-table SS-filtered-table.qza \
+  --o-visualization SS-filtered-table.qzv \
+  --m-sample-metadata-file OG_Cecal_Metadata.tsv
+
+echo "taxa barplot"
+
+#obtain taxa barplot
+qiime taxa barplot \
+  --i-table SS-filtered-table.qza \
+  --i-taxonomy taxonomy.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --o-visualization taxa-bar-plots.qzv
+
+echo "sampling depth"
+
+#use rarefaction to check on sampling depth
+qiime diversity alpha-rarefaction \
+  --i-table SS-filtered-table.qza \
+  --i-phylogeny rooted-tree.qza \
+  --p-max-depth 15000 \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --o-visualization alpha-rarefaction.qzv
+
+#designate a sampling depth and calculate diversity metrics
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree.qza \
+  --i-table SS-filtered-table.qza \
+  --p-sampling-depth 20689 \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --output-dir core-metrics-results
+
+echo "alpha diversity measures"
+
+qiime diversity alpha \
+  --i-table core-metrics-results/rarefied_table.qza \
+  --p-metric pielou_e \
+  --o-alpha-diversity core-metrics-results/pielou_e_vector.qza
+
+qiime diversity alpha \
+  --i-table core-metrics-results/rarefied_table.qza \
+  --p-metric observed_otus \
+  --o-alpha-diversity core-metrics-results/observed_otus_vector.qza
+
+qiime diversity alpha \
+  --i-table core-metrics-results/rarefied_table.qza \
+  --p-metric shannon \
+  --o-alpha-diversity core-metrics-results/shannon_vector.qza
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/faith_pd_vector.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --o-visualization core-metrics-results/faith-pd-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/evenness_vector.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --o-visualization core-metrics-results/evenness-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/shannon_vector.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --o-visualization core-metrics-results/shannon-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/observed_otus_vector.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --o-visualization core-metrics-results/observed-otus-group-significance.qzv
+
+echo "beta diversity measures"
+
+#caclulate beta diversity metrics only based on breed
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --m-metadata-column Breed \
+  --o-visualization core-metrics-results/bray-curtis-Breed-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --m-metadata-column Breed \
+  --o-visualization core-metrics-results/unweighted-unifrac-Breed-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file OG_Cecal_Metadata.tsv \
+  --m-metadata-column Breed \
+  --o-visualization core-metrics-results/weighted-unifrac-Breed-significance.qzv \
+  --p-pairwise
+
+echo "End time"
+date +"%d %B %Y %H:%M:%S"
+
+#to run: sbatch qiime_pipeline.slurm
