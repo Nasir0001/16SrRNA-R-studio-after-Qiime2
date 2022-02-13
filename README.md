@@ -6,7 +6,7 @@
 # statistical analysis: sample size
 The experimental unit was isolator with an exception for samples collected on day 7 in which each chick represented its own independent data point (N = 48, 24 SG and 24 CONV). Forty-eight samples were still collected for each of the remaining days of the experiment but because two birds of the same breed were sampled from each isolator, they were handled as replicates and their data was merged as a single point resulting in N = 24 on days 13, 17, 21 and 24. In this study, we did not have an isolator in which both replicates sampled on the same day were ‘lost’ and therefore 24 data points were collected in all 4 of the remaining days. 
 
-# Low biomass samples:
+# low biomass samples:
 The listed samples below (N = 14 total) are mising from the analysis due to having too low of microbial biomass to be detected by the sequencer:
 1. sample 41 (Ileal, D7, SG, C, from co-housing)
 2. sample 42 (Ileal, D7, SG, C, from co-housing)
